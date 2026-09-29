@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Circle, Rectangle
 
-__all__ = ["plot_demonstrations"]
+__all__ = ["plot_demonstrations", "plot_toy_samples"]
 
 LEFT_COLOR = "#c8451e"
 RIGHT_COLOR = "#1f5fc4"
@@ -34,6 +34,38 @@ def _draw_scene(axis, cfg) -> None:
     axis.set_ylabel("y [m]")
     axis.set_aspect("equal")
     axis.grid(alpha=0.25)
+
+
+def plot_toy_samples(dataset, samples: dict, path: str, max_points: int = 2000) -> None:
+    """Write the toy training data next to the generated samples.
+
+    Args:
+        dataset: A :class:`~behavior_cloning.data.toy.ToyDataset`.
+        samples: Generated points ``(n, 2)`` keyed by the legend label.
+        path: Output image path.
+        max_points: Points drawn per group.
+    """
+    figure, axes = plt.subplots(1, 2, figsize=(10, 5), sharex=True, sharey=True)
+    data = dataset.sample[:max_points].numpy()
+    axes[0].scatter(data[:, 0], data[:, 1], s=4, alpha=0.4, color="0.35")
+    axes[0].set_title(f"data ({dataset.distribution})")
+
+    for label, points in samples.items():
+        points = points[:max_points]
+        axes[1].scatter(points[:, 0], points[:, 1], s=4, alpha=0.4, label=label)
+    axes[1].set_title("samples")
+    if len(samples) > 1:
+        axes[1].legend(markerscale=3, loc="upper right")
+
+    for axis in axes:
+        axis.set_aspect("equal")
+        axis.grid(alpha=0.25)
+        axis.set_xlabel("x")
+    axes[0].set_ylabel("y")
+
+    figure.tight_layout()
+    figure.savefig(path, dpi=140)
+    plt.close(figure)
 
 
 def plot_demonstrations(data: dict, cfg, path: str, max_episodes: int = 60) -> None:

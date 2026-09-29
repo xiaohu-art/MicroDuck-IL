@@ -1,0 +1,35 @@
+defaults:
+  - policy: diffusion
+  - _self_
+
+seed: 0
+device: auto            # auto | cpu | cuda | mps
+
+policy:
+  backbone:
+    hidden_dims: [512, 512, 512]
+    activation: mish
+    time_embed_dim: 128
+
+toy:
+  distribution: two_moons   # two_moons | rotating_modes
+  num_samples: 16384
+  noise: 0.05
+
+train:
+  num_steps: 12000
+  batch_size: 256
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-6
+  lr_warmup_steps: 200
+  log_interval: 1000
+
+eval:
+  num_samples: 2000
+  cond_values: [0.0, 0.5, 1.0]    # rotating_modes only
+
+hydra:
+  job:
+    chdir: false
+  run:
+    dir: outputs/toy_${toy.distribution}_${policy.head}
