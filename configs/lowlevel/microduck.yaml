@@ -1,0 +1,139 @@
+env:
+  sim:
+    num_envs: 50
+    physics_dt: 0.005
+    decimation: 4
+    episode_length_s: 1.0e6
+
+  is_finite_horizon: false
+
+  command:
+    _target_: behavior_cloning.microduck.env.mdp.command.VelocityCommand
+    ranges:
+      lin_vel_x: [-0.4, 0.4]
+      lin_vel_y: [-0.3, 0.3]
+      ang_vel_z: [-1.0, 1.0]
+    resample: [3.0, 8.0]
+    standing_prob: 0.1
+    turn_in_place_prob: 0.15
+
+  action:
+    _target_: behavior_cloning.microduck.env.mdp.action.JointPositionAction
+    joint_names: ["^(?!neck|head).*"]
+    scale: 1.0
+    clip: null
+
+  observation:
+    _target_: behavior_cloning.microduck.env.mdp.observation.ObservationManager
+    groups:
+      policy:
+        base_ang_vel: {}
+        projected_gravity: {}
+        command: {func: velocity_command}
+        joint_pos: {func: joint_pos_rel}
+        joint_vel: {}
+        last_action: {}
+      critic:
+        base_lin_vel: {}          # privileged: critic only
+        base_ang_vel: {}
+        projected_gravity: {}
+        command: {func: velocity_command}
+        joint_pos: {func: joint_pos_rel}
+        joint_vel: {}
+        last_action: {}
+        feet_contact: {}          # privileged: critic only
+        feet_air_time: {}         # privileged: critic only
+
+  reward:
+    _target_: behavior_cloning.microduck.env.mdp.reward.RewardManager
+    terms:
+      track_lin_vel_xy: {weight: 2.0, params: {std: 0.316}}   # sqrt(0.1)
+      track_ang_vel_z:  {weight: 2.0, params: {std: 0.707}}   # sqrt(0.5)
+      upright:          {weight: 2.0, params: {std: 0.224}}   # sqrt(0.05)
+      action_rate_l2:   {weight: -0.1}
+      feet_air_time:
+        weight: 3.0
+        params: {threshold_min: 0.125, threshold_max: 0.3, command_threshold: 0.01}
+      pose:
+        weight: 1.0
+        params:
+          joint_names: ["^(?!neck|head).*"]   # legs only; head/neck are not pulled to default
+          walking_threshold: 0.01
+          std_standing: {".*hip_yaw.*": 0.1, ".*hip_roll.*": 0.05, ".*hip_pitch.*": 0.15, ".*knee.*": 0.15, ".*ankle.*": 0.1}
+          std_walking:  {".*hip_yaw.*": 0.3, ".*hip_roll.*": 0.05, ".*hip_pitch.*": 0.4, ".*knee.*": 0.4, ".*ankle.*": 0.25}
+      body_ang_vel:     {weight: -0.05}
+      foot_clearance:
+        weight: -2.0
+        params: {target_height: 0.02, command_threshold: 0.01}
+      foot_swing_height:
+        weight: -0.25
+        params: {target_height: 0.02, command_threshold: 0.01}
+      foot_slip:
+        weight: -0.1
+        params: {command_threshold: 0.01}
+
+  termination:
+    _target_: behavior_cloning.microduck.env.mdp.termination.TerminationManager
+    terms:
+      time_out: {time_out: true}
+      fell_over: {func: bad_orientation, params: {limit_angle: 3.2}}   # disabled
+      nan_state: {}
+
+robot:
+  model_path: robot_groundcontact.xml
+
+  pos: [0.0, 0.0, 0.12]
+  quat: [1.0, 0.0, 0.0, 0.0]
+
+  joints:
+    - name: left_hip_yaw
+      default_pos: 0.0
+    - name: left_hip_roll
+      default_pos: -0.0873
+    - name: left_hip_pitch
+      default_pos: -0.4579
+    - name: left_knee
+      default_pos: -0.0049
+    - name: left_ankle
+      default_pos: 0.4530
+    - name: neck_pitch
+      default_pos: 0.3491
+    - name: head_pitch
+      default_pos: 0.3491
+    - name: head_yaw
+      default_pos: 0.0
+    - name: head_roll
+      default_pos: 0.0
+    - name: right_hip_yaw
+      default_pos: 0.0
+    - name: right_hip_roll
+      default_pos: 0.0873
+    - name: right_hip_pitch
+      default_pos: 0.4579
+    - name: right_knee
+      default_pos: 0.0049
+    - name: right_ankle
+      default_pos: -0.4530
+
+  kp: 0.55
+  kv: 0.0
+  effort_limit: 0.96
+
+  feet_link_names: [ankle_left, ankle_right]
+  contact_force_threshold: 1.0      # N; standing load is ~3.6 N per foot
+  feet_site_offsets:
+    - [0.0, -0.0238146, -0.0140852]
+    - [0.0, -0.0238146, -0.0140852]
+
+obs_groups:
+  actor: [policy]
+  critic: [critic]
+
+actor:
+  hidden_dims: [512, 256, 128]
+  activation: elu
+  obs_normalization: true
+  distribution_cfg:
+    class_name: GaussianDistribution
+    init_std: 1.0
+    std_type: scalar

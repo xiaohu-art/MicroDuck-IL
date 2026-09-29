@@ -1,0 +1,3 @@
+head: flow
+
+num_inference_steps: 10             # Euler steps

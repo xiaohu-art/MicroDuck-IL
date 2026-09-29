@@ -1,0 +1,34 @@
+name: navigation
+
+data_path: data/demos.npz
+lowlevel_checkpoint: assets/lowlevel.pt
+
+obs_horizon: 2          # To
+pred_horizon: 16        # Tp; 3.2 s at 5 Hz
+action_horizon: 8       # Ta
+
+env:
+  decimation: 10        # high level at 5 Hz = 50 Hz / 10
+  max_steps: 75         # 15 s
+
+  obstacle_x: 0.60
+  obstacle_half_w: 0.25
+  obstacle_depth: 0.16
+  obstacle_height: 0.10
+  goal_offset: 0.60     # goal x = obstacle_x + goal_offset
+  goal_radius: 0.15
+
+  start_y: 0.06         # start pose randomization, +/-
+  start_yaw: 0.15       # rad, +/-
+
+expert:
+  detour_margin: 0.25   # added to obstacle_half_w
+  detour_offset: 0.18   # corridor waypoints at obstacle_x -/+ this
+  waypoint_radius: 0.12
+  v_max: 0.35
+  w_max: 1.0
+  k_heading: 2.0
+
+collect:
+  num_episodes: 400
+  batch_size: 50

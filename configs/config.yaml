@@ -1,0 +1,35 @@
+defaults:
+  - lowlevel: microduck
+  - task: navigation
+  - policy: diffusion
+  - _self_
+
+seed: 0                 # training seed
+device: auto            # auto | cpu | cuda | mps
+
+policy:
+  backbone:
+    hidden_dims: [512, 512, 512]
+    activation: mish
+    time_embed_dim: 128
+
+train:
+  num_epochs: 300
+  batch_size: 256
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-6
+  lr_warmup_steps: 200
+  ema_decay: 0.995
+  save_interval: 100
+  eval_interval: 100
+
+eval:
+  num_episodes: 50
+  scenario_seed: 100000   # start states
+  sample_seed: 7          # policy sampling
+
+hydra:
+  job:
+    chdir: false
+  run:
+    dir: outputs/${policy.head}_s${seed}_${now:%m%d-%H%M%S}
