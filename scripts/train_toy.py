@@ -12,7 +12,7 @@ import torch
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 
-from behavior_cloning.data import ToyDataset, toy_metrics
+from behavior_cloning.data import ToyDataset
 from behavior_cloning.logger import Logger
 from behavior_cloning.plots import plot_toy_samples
 from behavior_cloning.policy import build_head
@@ -67,23 +67,10 @@ def main(cfg: DictConfig) -> None:
     logger.close()
 
     head.eval()
-    cond_values = list(cfg.eval.cond_values) if dataset.cond_dim else [None]
-    generated, metrics = {}, []
-    for value in cond_values:
+    generated = {}
+    for value in list(cfg.eval.cond_values) if dataset.cond_dim else [None]:
         points = draw_samples(head, cfg.eval.num_samples, dataset.cond_dim, value, device)
         generated["samples" if value is None else f"c={value:.1f}"] = points
-        metrics.append(toy_metrics(dataset.distribution, points, value))
-
-    print(f"\n{'':<10}{'coverage':>12}{'off-manifold':>14}")
-    for label, row in zip(generated, metrics):
-        print(f"{label:<10}{row['coverage']:12.3f}{row['off_manifold']:14.3f}")
-    if len(metrics) > 1:
-        coverage = float(np.mean([row["coverage"] for row in metrics]))
-        off_manifold = float(np.mean([row["off_manifold"] for row in metrics]))
-        print(f"{'mean':<10}{coverage:12.3f}{off_manifold:14.3f}")
-    if dataset.cond_dim:
-        angles = [row["mean_angle"] for row in metrics]
-        print(f"\ncondition following {np.corrcoef(cond_values, angles)[0, 1]:.3f}")
 
     figure = os.path.join(output_dir, "toy_samples.png")
     plot_toy_samples(dataset, generated, figure)

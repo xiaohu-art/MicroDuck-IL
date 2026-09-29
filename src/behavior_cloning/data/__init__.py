@@ -1,7 +1,7 @@
 from .collect import collect_demonstrations
 from .dataset import MinMaxNormalizer, NavigationDataset
 from .expert import ScriptedExpert
-from .toy import ToyDataset, toy_metrics
+from .toy import ToyDataset
 
 __all__ = [
     "MinMaxNormalizer",
@@ -9,5 +9,4 @@ __all__ = [
     "ScriptedExpert",
     "ToyDataset",
     "collect_demonstrations",
-    "toy_metrics",
 ]

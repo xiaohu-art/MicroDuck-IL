@@ -17,7 +17,7 @@ toy:
   noise: 0.05
 
 train:
-  num_steps: 12000
+  num_steps: 20000
   batch_size: 256
   learning_rate: 1.0e-3
   weight_decay: 1.0e-6

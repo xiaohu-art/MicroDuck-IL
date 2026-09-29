@@ -1,4 +1,4 @@
-"""Diffusion-based action head trained with a DDPM objective."""
+"""Diffusion-based action head with deterministic DDIM sampling."""
 
 import math
 
@@ -40,12 +40,11 @@ class DiffusionHead(ActionHead):
         num_train_timesteps: Number of forward-process steps.
         beta_schedule: Beta schedule name for :func:`make_beta_schedule`.
         prediction_type: Noise prediction type; only ``epsilon`` is supported.
-        sampler: ``ddpm`` or ``ddim`` sampler.
         num_inference_steps: Default number of reverse steps.
         backbone: Keyword arguments forwarded to :class:`ConditionalMLP`.
 
     Raises:
-        ValueError: If ``prediction_type`` or ``sampler`` is unsupported.
+        ValueError: If ``prediction_type`` is unsupported.
     """
 
     def __init__(
@@ -55,18 +54,14 @@ class DiffusionHead(ActionHead):
         num_train_timesteps: int = 100,
         beta_schedule: str = "squaredcos_cap_v2",
         prediction_type: str = "epsilon",
-        sampler: str = "ddpm",
         num_inference_steps: int = 100,
         **backbone,
     ) -> None:
         super().__init__(sample_dim, cond_dim)
         if prediction_type != "epsilon":
             raise ValueError(f"Only 'epsilon' prediction is implemented, got '{prediction_type}'")
-        if sampler not in ("ddpm", "ddim"):
-            raise ValueError(f"sampler must be 'ddpm' or 'ddim', got '{sampler}'")
 
         self.num_train_timesteps = int(num_train_timesteps)
-        self.sampler = sampler
         self.num_inference_steps = int(num_inference_steps)
         self.register_buffer(
             "alphas_cumprod",
@@ -118,7 +113,6 @@ class DiffusionHead(ActionHead):
         cond: torch.Tensor | None = None,
         batch_size: int | None = None,
         num_inference_steps: int | None = None,
-        sampler: str | None = None,
     ) -> torch.Tensor:
         """Denoise standard normal noise into a sample ``(batch, sample_dim)``.
 
@@ -126,41 +120,25 @@ class DiffusionHead(ActionHead):
             cond: Condition ``(batch, cond_dim)``, or None when unconditional.
             batch_size: Required only when unconditional.
             num_inference_steps: Reverse steps; defaults to the configured value.
-            sampler: ``ddpm`` or ``ddim``; defaults to the configured value.
         """
         batch_size = self._batch_size(cond, batch_size)
-        sampler = sampler or self.sampler
         timesteps = self._timesteps(num_inference_steps or self.num_inference_steps)
 
         x = torch.randn(batch_size, self.sample_dim, device=self._device())
         for index, t in enumerate(timesteps):
             alpha_bar = self.alphas_cumprod[t]
-            previous = timesteps[index + 1] if index + 1 < len(timesteps) else None
             alpha_bar_prev = (
-                self.alphas_cumprod[previous] if previous is not None else torch.ones_like(alpha_bar)
+                self.alphas_cumprod[timesteps[index + 1]]
+                if index + 1 < len(timesteps)
+                else torch.ones_like(alpha_bar)
             )
 
             step = torch.full((batch_size,), t.item(), device=x.device)
             noise_pred = self.net(cond=cond, sample=x, timestep=step / self.num_train_timesteps)
 
             x0 = ((x - (1.0 - alpha_bar).sqrt() * noise_pred) / alpha_bar.sqrt()).clamp(-1.0, 1.0)
-            # Re-derived from the clipped x0: the deterministic sampler diverges
+            # Re-derived from the clipped x0: the deterministic update diverges
             # if the two are inconsistent.
             noise_pred = (x - alpha_bar.sqrt() * x0) / (1.0 - alpha_bar).sqrt()
-
-            if sampler == "ddim":
-                x = alpha_bar_prev.sqrt() * x0 + (1.0 - alpha_bar_prev).sqrt() * noise_pred
-                continue
-
-            alpha = alpha_bar / alpha_bar_prev
-            beta = 1.0 - alpha
-            mean = (
-                alpha_bar_prev.sqrt() * beta / (1.0 - alpha_bar) * x0
-                + alpha.sqrt() * (1.0 - alpha_bar_prev) / (1.0 - alpha_bar) * x
-            )
-            if previous is None:
-                x = mean
-            else:
-                variance = (1.0 - alpha_bar_prev) / (1.0 - alpha_bar) * beta
-                x = mean + variance.clamp(min=1e-20).sqrt() * torch.randn_like(x)
+            x = alpha_bar_prev.sqrt() * x0 + (1.0 - alpha_bar_prev).sqrt() * noise_pred
         return x

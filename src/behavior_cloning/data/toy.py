@@ -1,10 +1,10 @@
-"""2D toy distributions and scoring utilities for policy evaluation."""
+"""2D toy distributions for policy evaluation."""
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-__all__ = ["ToyDataset", "toy_metrics"]
+__all__ = ["ToyDataset"]
 
 RADIUS = 0.8
 MODE_BASE = np.pi / 4
@@ -77,46 +77,3 @@ class ToyDataset(Dataset):
     def __repr__(self) -> str:
         return f"ToyDataset({self.distribution}, {len(self)} samples, cond_dim={self.cond_dim})"
 
-
-def _moon_manifold(num_points: int = 512) -> tuple[np.ndarray, np.ndarray]:
-    """Return noise-free crescent points and the crescent index of each."""
-    t = np.linspace(0.0, np.pi, num_points)
-    outer = np.stack([np.cos(t), np.sin(t)], axis=-1)
-    inner = np.stack([1.0 - np.cos(t), 0.5 - np.sin(t)], axis=-1)
-    points = (np.concatenate([outer, inner]) - [0.5, 0.25]) / 1.5 * RADIUS
-    return points, np.repeat([0, 1], num_points)
-
-
-def toy_metrics(distribution: str, samples: np.ndarray, cond_value: float | None = None) -> dict:
-    """Score generated samples against the target toy manifold.
-
-    Args:
-        distribution: Distribution name.
-        samples: Generated points with shape ``(num_samples, 2)``.
-        cond_value: Conditioning value used for ``rotating_modes``.
-
-    Returns:
-        A dictionary with coverage and manifold-distance metrics.
-
-    Raises:
-        ValueError: If the distribution name is unknown.
-    """
-    if distribution == "two_moons":
-        points, labels = _moon_manifold()
-        distances = np.linalg.norm(samples[:, None, :] - points[None], axis=-1)
-        cluster = labels[distances.argmin(axis=1)]
-        return {
-            "coverage": float(min((cluster == 0).mean(), (cluster == 1).mean())),
-            "off_manifold": float(distances.min(axis=1).mean()),
-        }
-
-    if distribution == "rotating_modes":
-        angle = np.arctan2(samples[:, 1], samples[:, 0])
-        deviation = np.abs(np.abs(angle) - (MODE_BASE + cond_value * MODE_SPAN))
-        return {
-            "coverage": float(min((angle > 0).mean(), (angle < 0).mean())),
-            "off_manifold": float(np.minimum(deviation, 2 * np.pi - deviation).mean()),
-            "mean_angle": float(np.abs(angle).mean()),
-        }
-
-    raise ValueError(f"Unknown distribution '{distribution}'")
