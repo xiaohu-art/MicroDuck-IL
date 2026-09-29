@@ -59,15 +59,13 @@ Install [uv](https://docs.astral.sh/uv/) using the instructions for your operati
 ### 2. Install the project environment
 
 ```bash
-git clone <repository-url>
-cd homework2
+git clone https://github.com/xiaohu-art/MicroDuck-IL.git
+cd MicroDuck-IL
 
 uv sync                  # macOS (Apple Silicon, Metal GPU backend)
 uv sync --extra cuda     # Linux / Windows with an NVIDIA GPU
 uv sync --extra cpu      # Linux / Windows without a GPU
 ```
-
-This assignment runs comfortably on a laptop CPU in under an hour. The simulator uses CPU here, and 50 parallel environments are faster on CPU than on Metal. Only the policy network uses GPU when a suitable device is available.
 
 ## Basic Commands
 
@@ -85,8 +83,6 @@ Two distributions are available:
 |---|---|---|
 | `two_moons` | two crescents, no conditioning | can the head represent more than one mode at all? |
 | `rotating_modes` | two points on a circle at `±(π/4 + c·π/2)`, conditioned on `c ∈ [0, 1]` | does the conditioning path work, and can it still represent two modes? |
-
-Both settings are required. `two_moons` has no conditioning signal, so a head that ignores its conditioning input may still pass this test. `rotating_modes` exposes that mistake, and `two_moons` makes the collapse most obvious.
 
 ### Collecting demonstrations
 
@@ -125,8 +121,6 @@ The default run takes about 35 s for 300 epochs. Each run creates a directory un
 
 You may set `hydra.run.dir` to assign a readable name instead of a timestamp, for example `hydra.run.dir=outputs/diffusion`.
 
-The loss values of the three heads are not directly comparable because they measure different objectives: squared action error, noise-prediction error, and velocity-field error. Only the success rate is directly comparable.
-
 ### Evaluation
 
 ```bash
@@ -139,8 +133,6 @@ This runs 50 episodes from fixed start poses. It prints the success rate and the
 
 - **left**: the duck's actual xy path in each episode, colored by outcome
 - **right**: every velocity command the policy executed, shown as `(wz, vx)`
-
-The right panel is the most informative diagnostic. If the policy consistently turns in only one direction, or never turns at all, this is usually visible before the success rate makes it obvious.
 
 `--nfe` and `--action-horizon` affect how the trained policy is used, not how it was trained. Therefore, the sweeps in assignments 3 and 4 require no retraining. Reuse the checkpoints from assignment 2.
 
@@ -169,7 +161,7 @@ for dist in two_moons rotating_modes; do
 done
 ```
 
-Your implementation is correct when `diffusion` and `flow` cover both modes in both toy tasks, and the `rotating_modes` clusters move with `c`. Do not shorten the training schedule. At 4000 steps, a correct implementation still appears as a blob if the model is wrong.
+Your implementation is correct when `diffusion` and `flow` cover both modes in both toy tasks, and the `rotating_modes` clusters move with `c`. Do not shorten the training schedule.
 
 Answer in your report:
 
@@ -183,8 +175,6 @@ Answer in your report:
 ```bash
 uv run scripts/collect.py hydra.run.dir=outputs/demos
 ```
-
-Explain why this dataset differs from a dataset in which the expert always turns the same way. Also explain what the average of a left-turn command and a right-turn command means physically.
 
 **Train and compare (20 points).** Train all three heads and evaluate each:
 

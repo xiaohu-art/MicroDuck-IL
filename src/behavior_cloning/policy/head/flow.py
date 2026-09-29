@@ -30,11 +30,15 @@ class FlowHead(ActionHead):
 
     def loss(self, sample: torch.Tensor, cond: torch.Tensor | None = None) -> torch.Tensor:
         """Return the error on the path velocity at a uniformly drawn time."""
+        timesteps = torch.rand(sample.shape[0], device=sample.device)
         noise = torch.randn_like(sample)
-        t = torch.rand(sample.shape[0], device=sample.device)
-        interpolated = (1.0 - t).unsqueeze(-1) * noise + t.unsqueeze(-1) * sample
-        target = sample - noise
-        return F.mse_loss(self.net(cond=cond, sample=interpolated, timestep=t), target)
+
+        # TODO (4/5): Form `x_t` and the target velocity:
+        #   x_t = (1 - timesteps[:, None]) * noise + timesteps[:, None] * sample
+        #   target = sample - noise
+        # Predict `target` with `self.net(cond=cond, sample=x_t, timestep=timesteps)`
+        # and return `F.mse_loss(prediction, target)`.
+        raise NotImplementedError
 
     @torch.no_grad()
     def sample(
@@ -52,10 +56,13 @@ class FlowHead(ActionHead):
         """
         batch_size = self._batch_size(cond, batch_size)
         steps = num_inference_steps or self.num_inference_steps
-        dt = 1.0 / steps
-
         x = torch.randn(batch_size, self.sample_dim, device=self._device())
-        for index in range(steps):
-            t = torch.full((batch_size,), index * dt, device=x.device)
-            x = x + self.net(cond=cond, sample=x, timestep=t) * dt
-        return x
+        step_size = 1.0 / steps
+
+        # TODO (5/5): Integrate the velocity field with Euler's method:
+        #   for i in range(steps):
+        #       t = torch.full((batch_size,), i * step_size, device=x.device)
+        #       velocity = self.net(cond=cond, sample=x, timestep=t)
+        #       x = x + step_size * velocity
+        # Return `x` after the loop.
+        raise NotImplementedError

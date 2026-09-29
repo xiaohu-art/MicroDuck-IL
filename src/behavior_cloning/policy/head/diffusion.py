@@ -71,27 +71,30 @@ class DiffusionHead(ActionHead):
     def add_noise(
         self, sample: torch.Tensor, noise: torch.Tensor, timesteps: torch.Tensor
     ) -> torch.Tensor:
-        """Return ``sqrt(alpha_bar_t) * sample + sqrt(1 - alpha_bar_t) * noise``.
+        """Return the forward process applied to clean samples.
 
         Args:
             sample: Clean samples ``(batch, sample_dim)``.
             noise: Standard normal noise of the same shape.
             timesteps: Integer steps ``(batch,)`` in ``[0, num_train_timesteps)``.
         """
-        alpha_bar = self.alphas_cumprod[timesteps].unsqueeze(-1)
-        return alpha_bar.sqrt() * sample + (1.0 - alpha_bar).sqrt() * noise
+        alpha_bar_t = self.alphas_cumprod[timesteps].unsqueeze(-1)
+        # TODO (1/5): Implement the forward diffusion step:
+        #   x_t = alpha_bar_t.sqrt() * sample + (1 - alpha_bar_t).sqrt() * noise
+        raise NotImplementedError
 
     def loss(self, sample: torch.Tensor, cond: torch.Tensor | None = None) -> torch.Tensor:
         """Return the error on the noise added at a uniformly drawn timestep."""
         timesteps = torch.randint(
-            0, self.num_train_timesteps, (sample.shape[0],), device=sample.device
+            self.num_train_timesteps, (sample.shape[0],), device=sample.device
         )
         noise = torch.randn_like(sample)
-        noisy = self.add_noise(sample, noise, timesteps)
-        prediction = self.net(
-            cond=cond, sample=noisy, timestep=timesteps / self.num_train_timesteps
-        )
-        return F.mse_loss(prediction, noise)
+        noisy_sample = self.add_noise(sample, noise, timesteps)
+
+        # TODO (2/5): Predict `noise` from `noisy_sample` using normalized
+        # timesteps (`timesteps / self.num_train_timesteps`), then return the
+        # mean squared error between the prediction and `noise`.
+        raise NotImplementedError
 
     # ------------------------------------------------------------------
     # Reverse process
@@ -100,6 +103,19 @@ class DiffusionHead(ActionHead):
         """Return the strided subsequence of forward steps, from late to early."""
         steps = torch.linspace(0, self.num_train_timesteps - 1, num_inference_steps)
         return steps.round().long().flip(0)
+
+    @staticmethod
+    def _rederive_noise(
+        x: torch.Tensor, x0: torch.Tensor, alpha_bar: torch.Tensor
+    ) -> torch.Tensor:
+        """Return the noise consistent with a clamped clean sample.
+
+        Args:
+            x: Current noisy sample.
+            x0: Clean sample after clamping.
+            alpha_bar: Cumulative alpha at the current step.
+        """
+        return (x - alpha_bar.sqrt() * x0) / (1.0 - alpha_bar).sqrt()
 
     @torch.no_grad()
     def sample(
@@ -130,7 +146,9 @@ class DiffusionHead(ActionHead):
             step = torch.full((batch_size,), t.item(), device=x.device)
             noise_pred = self.net(cond=cond, sample=x, timestep=step / self.num_train_timesteps)
 
-            x0 = ((x - (1.0 - alpha_bar).sqrt() * noise_pred) / alpha_bar.sqrt()).clamp(-1.0, 1.0)
-            noise_pred = (x - alpha_bar.sqrt() * x0) / (1.0 - alpha_bar).sqrt()
-            x = alpha_bar_prev.sqrt() * x0 + (1.0 - alpha_bar_prev).sqrt() * noise_pred
+            # TODO (3/5): Implement one deterministic DDIM update:
+            #   x0 = ((x - (1 - alpha_bar).sqrt() * noise_pred) / alpha_bar.sqrt()).clamp(-1, 1)
+            #   noise_pred = self._rederive_noise(x, x0, alpha_bar)
+            #   x = alpha_bar_prev.sqrt() * x0 + (1 - alpha_bar_prev).sqrt() * noise_pred
+            raise NotImplementedError
         return x
