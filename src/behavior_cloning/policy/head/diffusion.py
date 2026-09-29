@@ -18,9 +18,6 @@ def make_beta_schedule(num_timesteps: int, schedule: str, max_beta: float = 0.99
         num_timesteps: Length of the forward process.
         schedule: ``squaredcos_cap_v2`` or ``linear``.
         max_beta: Upper bound on a single step's variance.
-
-    Raises:
-        ValueError: If the schedule name is unknown.
     """
     if schedule == "linear":
         return torch.linspace(1e-4, 0.02, num_timesteps)
@@ -42,9 +39,6 @@ class DiffusionHead(ActionHead):
         prediction_type: Noise prediction type; only ``epsilon`` is supported.
         num_inference_steps: Default number of reverse steps.
         backbone: Keyword arguments forwarded to :class:`ConditionalMLP`.
-
-    Raises:
-        ValueError: If ``prediction_type`` is unsupported.
     """
 
     def __init__(
@@ -137,8 +131,6 @@ class DiffusionHead(ActionHead):
             noise_pred = self.net(cond=cond, sample=x, timestep=step / self.num_train_timesteps)
 
             x0 = ((x - (1.0 - alpha_bar).sqrt() * noise_pred) / alpha_bar.sqrt()).clamp(-1.0, 1.0)
-            # Re-derived from the clipped x0: the deterministic update diverges
-            # if the two are inconsistent.
             noise_pred = (x - alpha_bar.sqrt() * x0) / (1.0 - alpha_bar).sqrt()
             x = alpha_bar_prev.sqrt() * x0 + (1.0 - alpha_bar_prev).sqrt() * noise_pred
         return x

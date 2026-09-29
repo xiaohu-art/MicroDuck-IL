@@ -12,10 +12,14 @@ class Logger:
     Args:
         path: CSV file to write; None logs to the console only.
         total: Final step value, used for the progress fraction and the ETA.
+        unit: Name printed in front of the step value.
     """
 
-    def __init__(self, path: str | None = None, total: int | None = None) -> None:
+    def __init__(
+        self, path: str | None = None, total: int | None = None, unit: str = "step"
+    ) -> None:
         self.total = total
+        self.unit = unit
         self.start = time.time()
         self._file = open(path, "w", newline="") if path else None
         self._writer = None
@@ -40,7 +44,7 @@ class Logger:
         timing = f"elapsed {elapsed:.0f}s"
         if self.total and step > 0:
             timing += f"  eta {elapsed * (self.total - step) / step:.0f}s"
-        print(f"step {progress}  {values}  {timing}", flush=True)
+        print(f"{self.unit} {progress}  {values}  {timing}", flush=True)
 
     def close(self) -> None:
         """Close the CSV file."""
